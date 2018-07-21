@@ -4,6 +4,7 @@ import csv
 import cv2
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 from keras.models import Sequential, Model
 from keras.layers import Flatten, Dense, Lambda, Input, merge
 from keras.layers.convolutional import Convolution2D
@@ -57,27 +58,19 @@ def Traffic_Net():
     pool1 = Convolution2D(nb_filter=24, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool1)
     pool1 = MaxPooling2D(pool_size=(2, 2), border_mode='valid')(pool1)
 
-    pool2 = Convolution2D(nb_filter=36, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool1)
-    pool2 = Convolution2D(nb_filter=48, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool2)
+    pool2 = Convolution2D(nb_filter=36, nb_row=5, nb_col=5, activation='relu', border_mode='valid')(pool1)
+    pool2 = Convolution2D(nb_filter=48, nb_row=5, nb_col=5, activation='relu', border_mode='valid')(pool2)
     pool2 = MaxPooling2D(pool_size=(2, 2), border_mode='valid')(pool2)
 
     pool1 = Flatten()(pool1)
     pool2 = Flatten()(pool2)
     pools = merge([pool1, pool2], mode='concat', concat_axis=1)
-    """
-    pool1 = tf.reshape(pool1, [-1, np.prod(pool1.get_shape()[1:].as_list())])
-    pool1 = tf.expand_dims(pool1, 2)
-    pool2 = tf.reshape(pool2, [-1, np.prod(pool2.get_shape()[1:].as_list())])
-    pool2 = tf.expand_dims(pool2, 2)
-    pools = tf.concat(concat_dim=1, values=[pool1, pool2])
-    """
 
     fc = Dense(512, activation='relu')(pools)
     fc = Dropout(0.5)(fc)
     fc = Dense(256, activation='relu')(fc)
     fc = Dropout(0.5)(fc)
     fc = Dense(1)(fc)
-    #fc = Lambda(output_layer, output_shape=output)
 
     model = Model(input=net_input, output=fc)
     return model
