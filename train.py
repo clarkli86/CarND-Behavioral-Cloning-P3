@@ -3,8 +3,9 @@
 import csv
 import cv2
 import numpy as np
-from keras.models import Sequential
-from keras.layers import Flatten, Dense, Lambda
+import tensorflow as tf
+from keras.models import Sequential, Model
+from keras.layers import Flatten, Dense, Lambda, Input, merge
 from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
 from keras.engine.topology import Merge
@@ -42,34 +43,43 @@ for image, measurement in zip(images, measurements):
 X_train = np.array(augmented_images)
 y_train = np.array(augmented_measurements)
 
+def output_layer(x):
+    return x
+
+def output_shape(x):
+    return x
+
 def Traffic_Net():
-    pool1 = Sequential()
-    pool1.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(160,320,3)))
-    pool1.add(Convolution2D(nb_filter=12, nb_row=3, nb_col=3, activation='relu', border_mode='valid'))
-    pool1.add(Convolution2D(nb_filter=24, nb_row=3, nb_col=3, activation='relu', border_mode='valid'))
-    pool1.add(MaxPooling2D(pool_size=(2, 2), border_mode='valid'))
-    pool1.summary()
-    pool1_flat = Sequential()
-    pool1_flat.add(pool1)
-    pool1_flat.add(Flatten())
+    net_input = Input(shape=(160, 320, 3))
+    pool1 = net_input
+    pool1 = Lambda(lambda x: (x / 255.0) - 0.5)(pool1)
+    pool1 = Convolution2D(nb_filter=12, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool1)
+    pool1 = Convolution2D(nb_filter=24, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool1)
+    pool1 = MaxPooling2D(pool_size=(2, 2), border_mode='valid')(pool1)
 
-    pool2 = Sequential()
-    pool2.add(pool1)
-    pool2.add(Convolution2D(nb_filter=36, nb_row=3, nb_col=3, activation='relu', border_mode='valid'))
-    pool2.add(Convolution2D(nb_filter=48, nb_row=3, nb_col=3, activation='relu', border_mode='valid'))
-    pool2.add(MaxPooling2D(pool_size=(2, 2), border_mode='valid'))
-    pool2.summary()
-    pool2_flat = Sequential()
-    pool2_flat.add(pool2)
-    pool2_flat.add(Flatten())
+    pool2 = Convolution2D(nb_filter=36, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool1)
+    pool2 = Convolution2D(nb_filter=48, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool2)
+    pool2 = MaxPooling2D(pool_size=(2, 2), border_mode='valid')(pool2)
 
-    model = Sequential()
-    model.add(Merge([pool1_flat, pool2_flat], mode='concat', concat_axis=1))
-    model.add(Dense(512, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(256, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(1))
+    pool1 = Flatten()(pool1)
+    pool2 = Flatten()(pool2)
+    pools = merge([pool1, pool2], mode='concat', concat_axis=1)
+    """
+    pool1 = tf.reshape(pool1, [-1, np.prod(pool1.get_shape()[1:].as_list())])
+    pool1 = tf.expand_dims(pool1, 2)
+    pool2 = tf.reshape(pool2, [-1, np.prod(pool2.get_shape()[1:].as_list())])
+    pool2 = tf.expand_dims(pool2, 2)
+    pools = tf.concat(concat_dim=1, values=[pool1, pool2])
+    """
+
+    fc = Dense(512, activation='relu')(pools)
+    fc = Dropout(0.5)(fc)
+    fc = Dense(256, activation='relu')(fc)
+    fc = Dropout(0.5)(fc)
+    fc = Dense(1)(fc)
+    #fc = Lambda(output_layer, output_shape=output)
+
+    model = Model(input=net_input, output=fc)
     return model
 
 model = Traffic_Net()
@@ -79,5 +89,5 @@ optimizer = Adam(lr=0.0005)
 model.compile(loss='mse', optimizer=optimizer)
 save_checkpointer = ModelCheckpoint(filepath="model.h5", monitor='val_loss', verbose=1, save_best_only=True)
 stop_checkpointer = EarlyStopping(monitor='val_loss', min_delta=0, patience=3, verbose=1, mode='auto')
-model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=1, callbacks=[save_checkpointer, stop_checkpointer])
+model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=10, callbacks=[save_checkpointer, stop_checkpointer])
 exit()
