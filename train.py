@@ -14,7 +14,12 @@ from keras.callbacks import *
 from keras.optimizers import Adam
 from keras import backend as K
 
-TRAINING_DATA_DIRS = ['training_data/basic_lap/', 'training_data/basic_lap_clockwise/']
+TRAINING_DATA_DIRS = ['training_data/basic_lap/', \
+                      'training_data/basic_lap_clockwise/',
+                      'training_data/recovery_lap/',
+                      'training_data/recovery_lap_clockwise/',
+                      'training_data/smooth_curves/',
+                      'training_data/smooth_curves_clockwise/']
 
 
 images = []
@@ -61,7 +66,7 @@ def display_cropped(model, image):
     plt.imshow(np.uint8(cropped_image.reshape(70, 320, 3)))
     plt.show()
 
-def Traffic_Net():
+def traffic_net():
     net_input = Input(shape=(160, 320, 3))
     pool1 = net_input
     pool1 = Lambda(lambda x: (x / 255.0) - 0.5)(pool1)
@@ -87,7 +92,28 @@ def Traffic_Net():
     model = Model(input=net_input, output=fc)
     return model
 
-model = Traffic_Net()
+def nvdia_net():
+    net_input = Input(shape=(160, 320, 3))
+    pool1 = net_input
+    pool1 = Lambda(lambda x: (x / 255.0) - 0.5)(pool1)
+    pool1 = Cropping2D(cropping=((65,25), (0,0)), input_shape=(3,160,320))(pool1)
+    pool1 = Convolution2D(nb_filter=24, nb_row=5, nb_col=5, sub_sample=(2, 2), activation='relu', border_mode='valid')(pool1)
+    pool1 = Convolution2D(nb_filter=36, nb_row=5, nb_col=5, sub_sample=(2, 2), activation='relu', border_mode='valid')(pool1)
+    pool1 = Convolution2D(nb_filter=48, nb_row=5, nb_col=5, sub_sample=(2, 2), activation='relu', border_mode='valid')(pool1)
+    pool1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, sub_sample=(1, 1), activation='relu', border_mode='valid')(pool1)
+    pool1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, sub_sample=(1, 1), activation='relu', border_mode='valid')(pool1)
+
+    pool1 = Flatten()(pool1)
+
+    fc = Dense(100, activation='relu')(pool1)
+    fc = Dense(50, activation='relu')(pool1)
+    fc = Dense(10, activation='relu')(pool1)
+    fc = Dense(1)(fc)
+
+    model = Model(input=net_input, output=fc)
+    return model
+
+model = traffic_net()
 model.summary()
 # TODO Exponential delay learning rate
 optimizer = Adam(lr=0.001)
