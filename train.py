@@ -14,25 +14,28 @@ from keras.callbacks import *
 from keras.optimizers import Adam
 from keras import backend as K
 
-TRAINING_DATA_DIR = 'training_data/basic_lap/'
+TRAINING_DATA_DIRS = ['training_data/basic_lap/', 'training_data/basic_lap_clockwise/']
 
-lines = []
-with open(TRAINING_DATA_DIR + 'driving_log.csv') as csvfile:
-    reader = csv.reader(csvfile)
-    for line in reader:
-        lines.append(line)
+
 images = []
 measurements = []
-for line in lines:
-    # Center image
-    source_path = line[0]
-    filename = source_path.split('/')[-1]
-    current_path = TRAINING_DATA_DIR  + 'IMG/' + filename
-    image = cv2.imread(current_path)
-    images.append(image)
-    # Steering angle
-    measurement = float(line[3])
-    measurements.append(measurement)
+
+for TRAINING_DATA_DIR in TRAINING_DATA_DIRS:
+    lines = []
+    with open(TRAINING_DATA_DIR + 'driving_log.csv') as csvfile:
+        reader = csv.reader(csvfile)
+        for line in reader:
+            lines.append(line)
+    for line in lines:
+        # Center image
+        source_path = line[0]
+        filename = source_path.split('/')[-1]
+        current_path = TRAINING_DATA_DIR  + 'IMG/' + filename
+        image = cv2.imread(current_path)
+        images.append(image)
+        # Steering angle
+        measurement = float(line[3])
+        measurements.append(measurement)
 
 augmented_images, augmented_measurements = [], []
 for image, measurement in zip(images, measurements):
