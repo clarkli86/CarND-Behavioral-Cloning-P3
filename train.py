@@ -71,23 +71,32 @@ def traffic_net():
     net_input = Input(shape=(160, 320, 3))
     pool1 = net_input
     pool1 = Lambda(lambda x: (x / 255.0) - 0.5)(pool1)
-    pool1 = Cropping2D(cropping=((65,25), (0,0)), input_shape=(160,320, 3))(pool1)
-    pool1 = Convolution2D(nb_filter=12, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool1)
-    pool1 = Convolution2D(nb_filter=24, nb_row=3, nb_col=3, activation='relu', border_mode='valid')(pool1)
+    pool1 = Cropping2D(cropping=((65,25), (0,0)), input_shape=(160, 320, 3))(pool1)
+    pool1 = Convolution2D(nb_filter=12, nb_row=3, nb_col=3, border_mode='valid')(pool1)
+    pool1 = ELU()(pool1)
+    pool1 = Convolution2D(nb_filter=24, nb_row=3, nb_col=3, border_mode='valid')(pool1)
+    pool1 = ELU()(pool1)
     pool1 = MaxPooling2D(pool_size=(2, 2), border_mode='valid')(pool1)
 
-    pool2 = Convolution2D(nb_filter=36, nb_row=5, nb_col=5, activation='relu', border_mode='valid')(pool1)
-    pool2 = Convolution2D(nb_filter=48, nb_row=5, nb_col=5, activation='relu', border_mode='valid')(pool2)
+    pool2 = Convolution2D(nb_filter=36, nb_row=5, nb_col=5, border_mode='valid')(pool1)
+    pool2 = ELU()(pool2)
+    pool2 = Convolution2D(nb_filter=48, nb_row=5, nb_col=5, border_mode='valid')(pool2)
+    pool2 = ELU()(pool2)
     pool2 = MaxPooling2D(pool_size=(2, 2), border_mode='valid')(pool2)
 
     pool1 = Flatten()(pool1)
     pool2 = Flatten()(pool2)
     pools = merge([pool1, pool2], mode='concat', concat_axis=1)
 
-    fc = Dense(512, activation='relu')(pools)
-    fc = Dropout(0.5)(fc)
-    fc = Dense(256, activation='relu')(fc)
-    fc = Dropout(0.5)(fc)
+    fc = Dense(100)(pools)
+    fc = ELU()(fc)
+    fc = Dropout(0.2)(fc)
+    fc = Dense(50)(fc)
+    fc = ELU()(fc)
+    fc = Dropout(0.2)(fc)
+    fc = Dense(10)(fc)
+    fc = ELU()(fc)
+    fc = Dropout(0.2)(fc)
     fc = Dense(1)(fc)
 
     model = Model(input=net_input, output=fc)
@@ -120,11 +129,9 @@ def nvidia_net():
     model.add(Dropout(0.2))
     model.add(Dense(50))
     model.add(ELU())
-    model.add(Dropout(0.2))
     model.add(Dense(10))
     model.add(ELU())
-    model.add(Dropout(0.2))
-    model.add(Dense(1, activation='tanh'))
+    model.add(Dense(1))
 
     return model
 
@@ -147,11 +154,12 @@ def common_ai_net():
     return model
 
 model = nvidia_net()
+#model = traffic_net()
 model.summary()
 # TODO Exponential delay learning rate
 model.compile(loss='mse', optimizer='adam')
-save_checkpointer = ModelCheckpoint(filepath="model.h5", monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=True)
-stop_checkpointer = EarlyStopping(monitor='val_loss', min_delta=0, patience=3, verbose=1, mode='auto')
+save_checkpointer = ModelCheckpoint(filepath="model.h5", monitor='val_loss', verbose=1, save_best_only=True)
+stop_checkpointer = EarlyStopping(monitor='val_loss', min_delta=0.0, patience=3, verbose=1, mode='auto')
 model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=10, callbacks=[save_checkpointer, stop_checkpointer])
 #display_cropped(model, X_train[0])
 exit()
