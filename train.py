@@ -2,9 +2,11 @@
 
 import csv
 import cv2
+import sklearn
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from random import shuffle
 from keras.models import Sequential, Model
 from keras.layers import Flatten, Dense, Lambda, Input, merge, ELU
 from keras.layers.convolutional import Convolution2D, Cropping2D
@@ -13,39 +15,90 @@ from keras.layers.core import Dropout
 from keras.callbacks import *
 from keras.optimizers import Adam
 from keras import backend as K
+from sklearn.model_selection import train_test_split
 
 TRAINING_DATA_DIRS = ['training_data/basic_lap/', \
                       'training_data/basic_lap_clockwise/',
                       'training_data/recovery_lap/',
-                      'training_data/recovery_lap_clockwise/',
+                      #'training_data/recovery_lap_clockwise/',
                       'training_data/smooth_curves/',
                       'training_data/smooth_curves_clockwise/',
                       'training_data/basic_lap_2/',
                       'training_data/basic_lap_2_clockwise/',
-                      'training_data/recovery_lap_2/',
-                      'training_data/recovery_lap_2_clockwise/']
+                      'training_data/recovery_lap_2/']
+                      #'training_data/recovery_lap_2_clockwise/']
 
+def process_image(filename):
+    image = cv2.imread(filename)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    return image
+
+def generator(samples, batch_size=32):
+    """ Generate next batch of training data """
+    num_samples = len(samples)
+    while 1: # Loop forever so the generator never terminates
+        shuffle(samples)
+        for offset in range(0, num_samples, batch_size):
+            batch_samples = samples[offset:offset+batch_size]
+
+            images = []
+            angles = []
+            for batch_sample in batch_samples:
+                image = process_image(batch_sample.filename)
+                images.append(image)
+                angles.append(batch_sample.steering)
+                #print(batch_sample.filename + " angle: " + str(batch_sample.steering))
+
+            # trim image to only see section with road
+            X_train = np.array(images)
+            y_train = np.array(angles)
+            yield sklearn.utils.shuffle(X_train, y_train)
 
 images = []
 measurements = []
 
+class Sample(object):
+    """Contains a sample and steering angle"""
+    def __init__(self, filename, steering):
+        self.filename = filename
+        self.steering = steering
+
+samples = []
+
 for TRAINING_DATA_DIR in TRAINING_DATA_DIRS:
-    lines = []
     with open(TRAINING_DATA_DIR + 'driving_log.csv') as csvfile:
         reader = csv.reader(csvfile)
         for line in reader:
-            lines.append(line)
-    for line in lines:
-        # Center image
-        source_path = line[0]
-        filename = source_path.split('/')[-1]
-        current_path = TRAINING_DATA_DIR  + 'IMG/' + filename
-        image = cv2.imread(current_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        images.append(image)
-        # Steering angle
-        measurement = float(line[3])
-        measurements.append(measurement)
+            current_path = TRAINING_DATA_DIR + 'IMG/' + line[0].split('/')[-1]
+            samples.append(Sample(current_path, float(line[3])))
+            # Optionally use the other two cameras
+            #current_path = TRAINING_DATA_DIR + 'IMG/' + line[1].split('/')[-1]
+            #samples.append(Sample(current_path, min(1.0, float(line[3]) + 0.2)))
+            #current_path = TRAINING_DATA_DIR + 'IMG/' + line[2].split('/')[-1]
+            #samples.append(Sample(current_path, max(-1.0, float(line[3]) - 0.2)))
+
+samples_left   = list(filter(lambda x : x.steering <= -0.4, samples))
+samples_center = list(filter(lambda x : x.steering > -0.4 and x.steering < 0.4, samples))
+samples_right  = list(filter(lambda x : x.steering >= 0.4, samples))
+
+shuffle(samples_left)
+shuffle(samples_center)
+shuffle(samples_right)
+
+train_samples = np.concatenate((samples_left[:int(len(samples_left) * 0.8)], samples_center[:int(len(samples_center) * 0.8)], samples_right[:int(len(samples_right) * 0.8)]))
+validation_samples = np.concatenate((samples_left[int(len(samples_left) * 0.8):], samples_center[int(len(samples_center) * 0.8):], samples_right[int(len(samples_right) * 0.8):]))
+
+# Plot distrubtion histograms in training/validation
+fig, axes = plt.subplots(1, 2)
+axes[0].hist([x.steering for x in train_samples], 10)
+axes[0].set_title('Distribution in training')
+axes[1].hist([x.steering for x in validation_samples], 10)
+axes[1].set_title('Validation in training')
+plt.show()
+
+# compile and train the model using the generator function
+train_generator = generator(train_samples, batch_size=32)
+validation_generator = generator(validation_samples, batch_size=32)
 
 augmented_images, augmented_measurements = [], []
 for image, measurement in zip(images, measurements):
@@ -139,24 +192,6 @@ def nvidia_net():
 
     return model
 
-def common_ai_net():
-    ch, row, col = 3, 160, 320  # camera format
-    model = Sequential()
-    model.add(Lambda(lambda x: x/127.5 - 1., input_shape=(ch, row, col), output_shape=(ch, row, col)))
-    model.add(Convolution2D(16, 8, 8, subsample=(4, 4), border_mode="same"))
-    model.add(ELU())
-    model.add(Convolution2D(32, 5, 5, subsample=(2, 2), border_mode="same"))
-    model.add(ELU())
-    model.add(Convolution2D(64, 5, 5, subsample=(2, 2), border_mode="same"))
-    model.add(Flatten())
-    model.add(Dropout(.2))
-    model.add(ELU())
-    model.add(Dense(512))
-    model.add(Dropout(.5))
-    model.add(ELU())
-    model.add(Dense(1))
-    return model
-
 model = nvidia_net()
 #model = traffic_net()
 model.summary()
@@ -164,6 +199,6 @@ model.summary()
 model.compile(loss='mse', optimizer='adam')
 save_checkpointer = ModelCheckpoint(filepath="model.h5", monitor='val_loss', verbose=1, save_best_only=True)
 stop_checkpointer = EarlyStopping(monitor='val_loss', min_delta=0.0, patience=3, verbose=1, mode='auto')
-model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=10, callbacks=[save_checkpointer, stop_checkpointer])
+model.fit_generator(train_generator, samples_per_epoch=len(train_samples), validation_data=validation_generator, nb_val_samples=len(validation_samples), nb_epoch=10, callbacks=[save_checkpointer, stop_checkpointer])
 #display_cropped(model, X_train[0])
 exit()
