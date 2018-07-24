@@ -19,7 +19,11 @@ TRAINING_DATA_DIRS = ['training_data/basic_lap/', \
                       'training_data/recovery_lap/',
                       'training_data/recovery_lap_clockwise/',
                       'training_data/smooth_curves/',
-                      'training_data/smooth_curves_clockwise/']
+                      'training_data/smooth_curves_clockwise/',
+                      'training_data/basic_lap_2/',
+                      'training_data/basic_lap_2_clockwise/',
+                      'training_data/recovery_lap_2/',
+                      'training_data/recovery_lap_2_clockwise/']
 
 
 images = []
