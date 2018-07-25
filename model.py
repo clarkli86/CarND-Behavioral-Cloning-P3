@@ -29,12 +29,17 @@ TRAINING_DATA_DIRS = ['training_data/basic_lap/', \
                       #'training_data/recovery_lap_2_clockwise/']
 
 def process_image(filename):
+    """
+    Open and convert image to RGB
+    """
     image = cv2.imread(filename)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image
 
 def generator(samples, batch_size=32):
-    """ Generate next batch of training data """
+    """
+    Generate next batch of training/validation data
+    """
     num_samples = len(samples)
     while 1: # Loop forever so the generator never terminates
         shuffle(samples)
@@ -54,15 +59,13 @@ def generator(samples, batch_size=32):
             y_train = np.array(angles)
             yield sklearn.utils.shuffle(X_train, y_train)
 
-images = []
-measurements = []
-
 class Sample(object):
     """Contains a sample and steering angle"""
     def __init__(self, filename, steering):
         self.filename = filename
         self.steering = steering
 
+# All samples for training/validation
 samples = []
 
 for TRAINING_DATA_DIR in TRAINING_DATA_DIRS:
@@ -77,6 +80,7 @@ for TRAINING_DATA_DIR in TRAINING_DATA_DIRS:
             #current_path = TRAINING_DATA_DIR + 'IMG/' + line[2].split('/')[-1]
             #samples.append(Sample(current_path, max(-1.0, float(line[3]) - 0.2)))
 
+# Split samples into three buckets
 samples_left   = list(filter(lambda x : x.steering <= -0.4, samples))
 samples_center = list(filter(lambda x : x.steering > -0.4 and x.steering < 0.4, samples))
 samples_right  = list(filter(lambda x : x.steering >= 0.4, samples))
@@ -85,6 +89,7 @@ shuffle(samples_left)
 shuffle(samples_center)
 shuffle(samples_right)
 
+# Split training/validation data with similar distribution
 train_samples = np.concatenate((samples_left[:int(len(samples_left) * 0.8)], samples_center[:int(len(samples_center) * 0.8)], samples_right[:int(len(samples_right) * 0.8)]))
 validation_samples = np.concatenate((samples_left[int(len(samples_left) * 0.8):], samples_center[int(len(samples_center) * 0.8):], samples_right[int(len(samples_right) * 0.8):]))
 
@@ -129,17 +134,19 @@ def traffic_net():
     pool1 = net_input
     pool1 = Lambda(lambda x: (x / 255.0) - 0.5)(pool1)
     pool1 = Cropping2D(cropping=((65,25), (0,0)), input_shape=(160, 320, 3))(pool1)
-    pool1 = Convolution2D(nb_filter=12, nb_row=3, nb_col=3, border_mode='valid')(pool1)
+    pool1 = Convolution2D(nb_filter=12, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid')(pool1)
     pool1 = ELU()(pool1)
-    pool1 = Convolution2D(nb_filter=24, nb_row=3, nb_col=3, border_mode='valid')(pool1)
+    pool1 = Dropout(0.2)(pool1)
+    pool1 = Convolution2D(nb_filter=24, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid')(pool1)
     pool1 = ELU()(pool1)
-    pool1 = MaxPooling2D(pool_size=(2, 2), border_mode='valid')(pool1)
+    pool1 = Dropout(0.2)(pool1)
 
-    pool2 = Convolution2D(nb_filter=36, nb_row=5, nb_col=5, border_mode='valid')(pool1)
+    pool2 = Convolution2D(nb_filter=36, nb_row=3, nb_col=3, border_mode='valid')(pool1)
     pool2 = ELU()(pool2)
-    pool2 = Convolution2D(nb_filter=48, nb_row=5, nb_col=5, border_mode='valid')(pool2)
+    pool2 = Dropout(0.2)(pool2)
+    pool2 = Convolution2D(nb_filter=48, nb_row=3, nb_col=3, border_mode='valid')(pool2)
     pool2 = ELU()(pool2)
-    pool2 = MaxPooling2D(pool_size=(2, 2), border_mode='valid')(pool2)
+    pool2 = Dropout(0.2)(pool2)
 
     pool1 = Flatten()(pool1)
     pool2 = Flatten()(pool2)
@@ -150,10 +157,8 @@ def traffic_net():
     fc = Dropout(0.2)(fc)
     fc = Dense(50)(fc)
     fc = ELU()(fc)
-    fc = Dropout(0.2)(fc)
     fc = Dense(10)(fc)
     fc = ELU()(fc)
-    fc = Dropout(0.2)(fc)
     fc = Dense(1)(fc)
 
     model = Model(input=net_input, output=fc)
