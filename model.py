@@ -50,6 +50,8 @@ def generator(samples, batch_size=32):
             angles = []
             for batch_sample in batch_samples:
                 image = process_image(batch_sample.filename)
+                if batch_sample.flip:
+                    image = cv2.flip(image, 1)
                 images.append(image)
                 angles.append(batch_sample.steering)
                 #print(batch_sample.filename + " angle: " + str(batch_sample.steering))
@@ -61,9 +63,10 @@ def generator(samples, batch_size=32):
 
 class Sample(object):
     """Contains a sample and steering angle"""
-    def __init__(self, filename, steering):
+    def __init__(self, filename, steering, flip):
         self.filename = filename
         self.steering = steering
+        self.flip = flip
 
 # All samples for training/validation
 samples = []
@@ -73,7 +76,8 @@ for TRAINING_DATA_DIR in TRAINING_DATA_DIRS:
         reader = csv.reader(csvfile)
         for line in reader:
             current_path = TRAINING_DATA_DIR + 'IMG/' + line[0].split('/')[-1]
-            samples.append(Sample(current_path, float(line[3])))
+            steering = float(line[3])
+            samples.append(Sample(current_path, steering, False))
             # Optionally use the other two cameras
             #current_path = TRAINING_DATA_DIR + 'IMG/' + line[1].split('/')[-1]
             #samples.append(Sample(current_path, min(1.0, float(line[3]) + 0.2)))
@@ -105,16 +109,6 @@ plt.show()
 train_generator = generator(train_samples, batch_size=32)
 validation_generator = generator(validation_samples, batch_size=32)
 
-augmented_images, augmented_measurements = [], []
-for image, measurement in zip(images, measurements):
-    augmented_images.append(image)
-    augmented_measurements.append(measurement)
-    augmented_images.append(cv2.flip(image, 1))
-    augmented_measurements.append(measurement * -1.0)
-
-X_train = np.array(augmented_images)
-y_train = np.array(augmented_measurements)
-
 def display_cropped(model, image):
     """
     Output from cropping layer. Will be useful for writeup
@@ -130,6 +124,9 @@ def display_cropped(model, image):
     plt.show()
 
 def traffic_net():
+    """
+    Multi-Stage Traffic Net with modified hidden layers and filter size
+    """
     net_input = Input(shape=(160, 320, 3))
     pool1 = net_input
     pool1 = Lambda(lambda x: (x / 255.0) - 0.5)(pool1)
@@ -148,6 +145,7 @@ def traffic_net():
     pool2 = ELU()(pool2)
     pool2 = Dropout(0.2)(pool2)
 
+    # Connect both stage 1 convolutional layer and stage 2 convolution layer to hidden layers
     pool1 = Flatten()(pool1)
     pool2 = Flatten()(pool2)
     pools = merge([pool1, pool2], mode='concat', concat_axis=1)
@@ -200,7 +198,7 @@ def nvidia_net():
 model = nvidia_net()
 #model = traffic_net()
 model.summary()
-# TODO Exponential delay learning rate
+# TODO Exponential decay learning rate
 model.compile(loss='mse', optimizer='adam')
 save_checkpointer = ModelCheckpoint(filepath="model.h5", monitor='val_loss', verbose=1, save_best_only=True)
 stop_checkpointer = EarlyStopping(monitor='val_loss', min_delta=0.0, patience=3, verbose=1, mode='auto')
