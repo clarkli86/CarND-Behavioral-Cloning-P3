@@ -157,7 +157,7 @@ Non-trainable params: 0
 
 Here is a visualization of the architecture.
 
-<center><img src="res/model.png" width="150"></center>
+<p align="center"><img src="res/model.png" width="150"></p>
 
 #### 3. Creation of the Training Set & Training Process
 
