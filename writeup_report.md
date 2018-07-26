@@ -171,8 +171,8 @@ I then recorded the vehicle driving in the opposite direction to balance the dis
 
 I then recorded the vehicle recovering from the left side and right sides of the road back to center, so that the vehicle would learn to steer back if the car drifts to left or right. These images show what a recovery looks like:
 
-<center>Left:<br><img src="res/left_lane.png" width="250"></center>
-<center>Right:<br><img src="res/right_lane.png" width="250"></center>
+<div style="text-align:center">Left:<br><img src="res/left_lane.png" width="250"></div>
+<div style="text-align:center">Right:<br><img src="res/right_lane.png" width="250"></div>
 
 Then I repeated this process on track two in order to get more data points.
 
