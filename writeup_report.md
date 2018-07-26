@@ -163,7 +163,7 @@ Here is a visualization of the architecture.
 
 To capture good driving behavior, I first recorded one lap on track one using center lane driving. Here is an example image of center lane driving:
 
-<center><img src="res/center_lane.png" width="250"></center>
+<p align="center"><img src="res/center_lane.png" width="250"></p>
 
 I then recorded the vehicle driving in the opposite direction to balance the distribution of left turns and right turns. Here is an image the final steering angle distribution:
 
@@ -171,19 +171,19 @@ I then recorded the vehicle driving in the opposite direction to balance the dis
 
 I then recorded the vehicle recovering from the left side and right sides of the road back to center, so that the vehicle would learn to steer back if the car drifts to left or right. These images show what a recovery looks like:
 
-<div style="text-align:center">Left:<br><img src="res/left_lane.png" width="250"></div>
-<div style="text-align:center">Right:<br><img src="res/right_lane.png" width="250"></div>
+<p align="center">Left:<br><img src="res/left_lane.png" width="250"></p>
+<p align="center">Right:<br><img src="res/right_lane.png" width="250"></p>
 
 Then I repeated this process on track two in order to get more data points.
 
 When evaluating the model in autonomous mode, the car drove off the track sometimes at sand and parallel tracks. So I also collected more recovery samples.
 
-<center>Sand:<br><img src="res/sand.png" width="250"></center>
-<center>Parallel Tracks:<br><img src="res/parallel.png" width="250"></center>
+<p align="center">Sand:<br><img src="res/sand.png" width="250"></p>
+<p align="center">Parallel Tracks:<br><img src="res/parallel.png" width="250"></p>
 
 Before the convolutional layers top 65 pixels and bottom 25 pixels are cropped out. Trees and rocks in top part and car hood in bottom part are only distracting to the model.
 
-<center><img src="res/normal.png" width="250"><img src="res/cropped.png" width="250"></center>
+<p align="center"><img src="res/normal.png" width="250"><img src="res/cropped.png" width="250"></p>
 
 I didn't augment the images because the initial set was enough to train a successful model. Flipping feature, however, is left as a placeholder for future usage. (`model.py` line 54-55)
 
